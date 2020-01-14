@@ -1,0 +1,21 @@
+{
+  "name": "CrawlerNode",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "cross-env NODE_ENV=production nodemon --inspect --exec babel-node app.js"
+  },
+  "dependencies": {
+    "puppeteer": "^2.0.0",
+    "puppeteer-cluster": "latest",
+    "puppeteer-core": "^2.0.0",
+    "request": "^2.88.0",
+    "url": "^0.11.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.8.0",
+    "@babel/core": "^7.8.0",
+    "@babel/node": "^7.8.0",
+    "@babel/preset-env": "^7.8.2",
+    "cross-env": "^6.0.3"
+  }
+}
