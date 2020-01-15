@@ -18,6 +18,11 @@ async function preparePage(page) {
 const init = async ({page, data: url}) => {
     // prepare page
     await preparePage(page);
+    page.setCookie({
+        "name": "PHPSESSID",
+        "value": "16ff5a492ee3cdaad357e48dc4c97c8d",
+        "domain": "speed.test"
+    });
 
     // dismiss dialog
     await page.on('dialog', async dialog => {
@@ -30,7 +35,8 @@ const init = async ({page, data: url}) => {
     });
 
     await page.goto(url, {
-        waitUntil: 'networkidle2'   // avoid network congestion
+        waitUntil: 'networkidle2',   // avoid network congestion
+        timeout: 3000,
     });
 
     // parse node links
@@ -83,7 +89,7 @@ const init = async ({page, data: url}) => {
 
     await cluster.task(init);
 
-    cluster.queue('http://ctf.ctf/1.html');
+    cluster.queue('http://speed.test');
 
     await cluster.idle();
     await cluster.close();

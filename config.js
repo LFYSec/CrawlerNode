@@ -9,7 +9,7 @@ export const launchOptions = {
         width: 1920,
         height: 1080
     },
-    timeout: 5000,
+
     args: [
         '--headless',
         '--disable-gpu',

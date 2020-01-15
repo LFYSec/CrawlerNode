@@ -7,6 +7,7 @@ export const parseURL = (url, pageURL) => {
     let result = urlparser.parse(url);
     let parsedUrl = result.href;
     let path = result.pathname;
+    let pageHost = urlparser.parse(pageURL).host
 
     let staticSuffix = ['css', 'js', 'jpg', 'png', 'gif', 'svg', 'jpeg', 'ico']
 
@@ -18,19 +19,19 @@ export const parseURL = (url, pageURL) => {
         }
     }
 
+    // relative oath
+    if (result.host == null) {
+        parsedUrl =  urlparser.resolve("http://" + pageHost, result.href);
+    }
+
     // drop other hosts
-    if (result.host !== urlparser.parse(pageURL).host) {
+    if (result.host !== null && result.host !== pageHost) {
         return null;
     }
 
     // url start with '//'
     if (url.startsWith("//")) {
         parsedUrl = "http://" + url.substr(2);
-    }
-
-    // relative oath
-    if (result.host == null) {
-        parsedUrl = pageURL + "/" + result.href;
     }
 
     return parsedUrl;
