@@ -50,13 +50,12 @@ const init = async ({page, data: url}) => {
     });
 
     // collect node links and comment links
-    const links = await page.$$eval("[src],[href],[data-url],[longDesc],[lowsrc]", linkHandler.getNodeLink);
-
+    let links = await page.$$eval("[src],[href],[data-url],[longDesc],[lowsrc]", linkHandler.getNodeLink);
     for (let link of links) {
-        let parsedURL = func.parseURL(link, await page.url());
-        if (parsedURL != null) {
-            console.log("parsedURL: " + parsedURL);
-            func.addQueue(parsedURL);
+        let parsedUrl = func.parseURL(link, await page.url());
+        if (parsedUrl != null) {
+            //console.log("parsedURL: " + parsedURL);
+            func.addQueue(parsedUrl);
         }
     }
 
@@ -64,7 +63,6 @@ const init = async ({page, data: url}) => {
     const commentUrls = await linkHandler.parseCommentUrl(commentNodes);
     if (commentUrls !== undefined) {
         for (let url of commentUrls) {
-            console.log(url);
             let parsedUrl = func.parseURL(url, await page.url());
             if(parsedUrl){
                 func.addQueue(parsedUrl);
@@ -72,27 +70,47 @@ const init = async ({page, data: url}) => {
         }
     }
 
-    // inline event trigger
-    for (let i = 0; i < config.inlineEvents.length; i++) {
-        let eventName = config.inlineEvents[i];
+    // inline event trigger TODO fix bug
+    const inlineEvents = ["onclick", "onblur", "onchange", "onabort", "ondblclick", "onerror", "onfocus", "onkeydown", "onkeypress", "onkeyup", "onload", "onmousedown", "onmousemove", "onmouseout", "onmouseover", "onmouseup", "onreset", "onresize", "onselect", "onsubmit", "onunload"];
+    // for (let i = 0; i < inlineEvents.length; i++) {
+    //     let eventName = inlineEvents[i];
+    //     console.log(eventName);
+    //     await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
+    // }
+    for(let eventName of inlineEvents){
+        let nodes = await page.$$("[" + eventName + "]");
+        for(let node of nodes){
+            let nodename = await node.executionContext().evaluate(node => node.nodeName, node);
+            console.log(nodename);
+        }
         await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
     }
 
     // dom event collection and trigger
-    // TODO
+    eventHandler.domEventTrigger();
 
     // form collection and auto submit
     const formNodes = await page.$$("form");
     await formHandler.formHandler(formNodes, page);
 
-    const title = await page.title();
-    console.log(title);
+    // handle hooked url
+    for(let hookedUrl of HOOK_URL_LIST){
+        console.log(hookedUrl);
+        let parsedUrl = func.parseURL(hookedUrl);
+        if(parsedUrl){
+            func.addQueue(parsedUrl);
+        }
+    }
+    // const title = await page.title();
+    // console.log(title);
 };
 
 
 (async () => {
     /*eslint no-undef:0*/
     global.cluster = await Cluster.launch(config.clusterLaunchOptions);
+    global.EVENT_LIST = [];
+    global.HOOK_URL_LIST = [];
 
     cluster.on("taskerror", (err, data) => {
         console.log(`Error crawling ${data}: ${err.message}`);
@@ -100,7 +118,7 @@ const init = async ({page, data: url}) => {
 
     await cluster.task(init);
 
-    func.addQueue("http://ctf.ctf/1.html");
+    func.addQueue("http://speed.test/");
 
     await cluster.idle();
     await cluster.close();

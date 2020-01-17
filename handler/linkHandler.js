@@ -1,11 +1,11 @@
 export const getNodeLink = (nodes) => {
     let result = [];
-    let attrs = ['src', 'href', 'data-url', 'longDesc', 'lowsrc']
+    let attrs = ['src', 'href', 'data-url', 'longDesc', 'lowsrc'];
     for (let node of nodes) {
         for (let attr of attrs) {
             let link = node.getAttribute(attr);
             if (link) {
-                result.push(link)
+                result.push(link);
             }
         }
     }

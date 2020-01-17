@@ -1,7 +1,5 @@
 import {Cluster} from "puppeteer-cluster";
 
-export const inlineEvents = ["onabort", "onblur", "onchange", "onclick", "ondblclick", "onerror", "onfocus", "onkeydown", "onkeypress", "onkeyup", "onload", "onmousedown", "onmousemove", "onmouseout", "onmouseover", "onmouseup", "onreset", "onresize", "onselect", "onsubmit", "onunload"];
-
 export const launchOptions = {
     "executablePath": "/Users/lfy/Dev/Node/CrawlerNode/node_modules/puppeteer/.local-chromium/mac-706915/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
     "ignoreHTTPSErrors": true,

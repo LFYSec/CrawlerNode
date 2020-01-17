@@ -7,7 +7,7 @@ export const parseURL = (url, pageURL) => {
     let path = result.pathname;
     let pageHost = urlparser.parse(pageURL).host;
 
-    let staticSuffix = ['css', 'js', 'jpg', 'png', 'gif', 'svg', 'jpeg', 'ico']
+    const staticSuffix = ['css', 'js', 'jpg', 'png', 'gif', 'svg', 'jpeg', 'ico']
 
     // drop static resources request
     if (path && path !== '/') {
@@ -35,28 +35,41 @@ export const parseURL = (url, pageURL) => {
     return parsedUrl;
 };
 
+function isRepeat(url) {
+    let path = urlparser.parse(url).path; //TODO
+    //console.log(path);
+    return false;
+}
+
+export const addQueue = (url) => {
+    if (!isRepeat(url)) {
+/*eslint no-undef:0*/
+        cluster.queue(url);
+    }
+};
+
 export const hookJS = () => {
     const unChange = {writable: false, configurable: false};
 
     // hook history route
     window.history.pushState = function (a, b, url) {
-        console.log(url);
+        HOOK_URL_LIST.push(url);
     };
     Object.defineProperty(window.history, "pushState", unChange);
 
     window.history.replaceState = function (a, b, url) {
-        console.log(url);
+        HOOK_URL_LIST.push(url);
     };
     Object.defineProperty(window.history, "replaceState", unChange);
 
     // hook hash change route
     window.addEventListener("hashchange", function () {
-        console.log(document.location.href);
+        HOOK_URL_LIST.push(document.location.href);
     });
 
     // hook new window
     window.open = function (url) {
-        console.log(url);
+        HOOK_URL_LIST.push(url);
     };
     Object.defineProperty(window, 'open', unChange);
 
@@ -68,18 +81,21 @@ export const hookJS = () => {
     // hook new requests
     let oldWebSocket = window.WebSocket;
     window.WebSocket = function (url) {
+        HOOK_URL_LIST.push(url);
         console.log(`WebSocket: ${url}`);
         return new oldWebSocket(url);
     };
 
     let oldEventSource = window.EventSource;
     window.EventSource = function (url) {
+        HOOK_URL_LIST.push(url);
         console.log(`EventSource: ${url}`);
         return new oldEventSource(url);
     };
 
     let oldFetch = window.fetch;
     window.fetch = function (url) {
+        HOOK_URL_LIST.push(url);
         console.log(`fetch: ${url}`);
         return oldFetch(url);
     };
@@ -108,16 +124,41 @@ export const hookJS = () => {
     iframe.name = "i_frame";
     iframe.display = "none";
     document.body.appendChild(iframe);
-};
 
-function isRepeat(url) {
-    let path = urlparser.parse(url).path;
-    console.log(url);
-    return false;
-}
+    // hook new dom node
+    document.addEventListener('DOMNodeInserted', function(e) {
+        let node = e.target;
+        if(node.src || node.href){
+            let parsedUrl = parseURL(node.src || node.href);
+            addQueue(parsedUrl);
+        }
+    }, true);
 
-export const addQueue = async (url) => {
-    if (!isRepeat(url)) {
-        cluster.queue(url);
+    // hook dom2 event
+    let _addEventListener = Element.prototype.addEventListener;
+    Element.prototype.addEventListener = function(eventName,func,capture) {
+        console.log(eventName + ": " + this.tagName);
+        EVENT_LIST.push({"eventName": eventName, "element": this})
+        _addEventListener.apply(this, arguments);
+    };
+
+    // hook dom0 event
+    function dom0Hook(that, eventName) {
+        console.log(eventName + ": " + that.tagName);
+        EVENT_LIST.push({"element": that, "eventName": eventName})
+    }
+
+    Object.defineProperties(HTMLElement.prototype, {
+        onclick: {set: function(newValue){onclick = newValue;dom0Hook(this, "click");}},
+        onchange: {set: function(newValue){onchange = newValue;dom0Hook(this, "change");}},
+        onblur: {set: function(newValue){onblur = newValue;dom0Hook(this, "blur");}},
+        ondblclick: {set: function(newValue){ondblclick = newValue;dom0Hook(this, "dblclick");}},
+        onfocus: {set: function(newValue){onfocus = newValue;dom0Hook(this, "focus");}},
+    });
+
+    // 禁止重定义访问器属性
+    for(let eventName of ["onclick", "onchange", "onblur", "onfocus", "ondblclick"]){
+        Object.defineProperty(HTMLElement.prototype,eventName,{"configurable": false});
     }
 };
+
