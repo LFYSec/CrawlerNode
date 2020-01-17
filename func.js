@@ -1,4 +1,4 @@
-import urlparser from 'url'
+import urlparser from "url"
 import request from "request";
 import fs from "fs";
 
@@ -21,7 +21,7 @@ export const parseURL = (url, pageURL) => {
 
     // relative oath
     if (result.host == null) {
-        parsedUrl =  urlparser.resolve("http://" + pageHost, result.href);
+        parsedUrl = urlparser.resolve("http://" + pageHost, result.href);
     }
 
     // drop other hosts
@@ -31,7 +31,7 @@ export const parseURL = (url, pageURL) => {
 
     // url start with '//'
     if (url.startsWith("//")) {
-        parsedUrl = "http://" + url.substr(2);
+        parsedUrl = "http://" + url.substr(2); // TODO https?
     }
 
     return parsedUrl;
@@ -60,6 +60,23 @@ export const inlineEventTrigger = (nodes, eventName) => {
         } catch (e) {
             console.log(e);
         }
+    }
+};
+
+let handlerSelect = async (node, page) => {
+    let optionValue = await node.executionContext().evaluate((node) => {
+        let result = [];
+        for (let option of node.children) {
+            let value = option.getAttribute("value");
+            if (value) {
+                result.push(value)
+            }
+        }
+        return result;
+    }, node);
+
+    if (optionValue.length > 0) {
+        page.evaluate("(select) => select.options[i].selected = true;", node);
     }
 };
 
@@ -100,6 +117,12 @@ export const formHandler = {
                 await nodeExec.evaluate(node => node.removeAttribute('required'), node);
                 await node.uploadFile("./image/1.png");
                 break;
+            case "radio":
+                await node.click();
+                break;
+            case "checkbox":
+                await node.click();
+                break;
             case "submit":
                 break;
             default:
@@ -107,15 +130,16 @@ export const formHandler = {
         }
         return type;
     },
-    "selector": 1,
+    "select": handlerSelect,
+    "datalist": handlerSelect,
     "textarea": async (node) => {
         await node.type("' or 1#", {delay: 100});
     },
 };
 
 export const handleNav = async (req, page) => {
+    let result = [];
     let url = req.url();
-    //console.log(req.url());
     let parsedUrl = parseURL(url, page.url());
 
     // 前或后端跳转，且跳转url经过解析后非空(host与当前page相同)，且非初始化page请求
@@ -123,24 +147,25 @@ export const handleNav = async (req, page) => {
         // check 302
         request(parsedUrl, function (error, response, body) {
             if (!error && response.statusCode.toString().substr(0, 2) === '30') {
-                if (body != null) {
-                    cluster.queue(parsedUrl);
+                result.push(parseURL(response.headers().location));
+                if (body === null) {
+                    // TODO (?)
                 }
-                cluster.queue(response.headers().location);
                 req.respond({
-                    "status": 204,
+                    "status": 200,
+                    "body": body,
                 });
-                return;
+                return result;
             }
         });
 
         // check frontend location
-        cluster.queue(parsedUrl);
+        result.push(parsedUrl);
 
         req.respond({
             "status": 204,
         });
-        return;
+        return result;
     }
 
     if (url.endsWith(".ico") || req.resourceType() === "image" || req.resourceType() === "media") {
@@ -157,6 +182,7 @@ export const handleNav = async (req, page) => {
         req.respond({
             "status": 204,
         });
+        return;
     }
 
     if (parsedUrl != null || page.url() === "about:blank") {
@@ -234,12 +260,31 @@ export const hookJS = () => {
     window.setInterval = function (time) {
         console.log(`setInterval: ${time}`);
         return oldSetInterval(1.5);
-    }
+    };
 
     // inject a hidden iframe to submit form
     let iframe = document.createElement('iframe');
     iframe.name = "i_frame";
     iframe.display = "none";
     document.body.appendChild(iframe);
+};
 
+export const parseCommentUrl = async (nodes) => {
+    let result = [];
+    for (let node of nodes) {
+        let commentContent = await node.executionContext().evaluate(node => node.textContent, node);
+        let matches = await regexCommentUrl(commentContent);
+        if (matches) {
+            for (let url of matches) {
+                result.push(url);
+            }
+        }
+    }
+    return result;
+};
+
+async function regexCommentUrl(commentContent) {
+    let pattern = /(https?|ftp|file):\/\/[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]/gi; // TODO nodeJS多行正则没法用
+    let urls = commentContent.match(pattern);
+    return urls;
 }

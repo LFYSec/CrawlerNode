@@ -104,6 +104,5 @@ dist
 .tern-port
 
 .idea/
-test.js
+test*
 image/
-

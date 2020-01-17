@@ -1,6 +1,6 @@
-import {Cluster} from 'puppeteer-cluster'
-import * as func from './func'
-import * as config from './config'
+import {Cluster} from "puppeteer-cluster"
+import * as func from "./func"
+import * as config from "./config"
 
 async function preparePage(page) {
     // set ua
@@ -25,21 +25,26 @@ const init = async ({page, data: url}) => {
     });
 
     // dismiss dialog
-    await page.on('dialog', async dialog => {
+    await page.on("dialog", async dialog => {
         await dialog.dismiss();
     });
 
     // lock the navigate
-    await page.on('request', async (req) => {
-        await func.handleNav(req, page);
+    await page.on("request", async (req) => {
+        const navUrls = await func.handleNav(req, page);
+        if (navUrls !== undefined) {
+            for (let url of navUrls) {
+                cluster.queue(url);
+            }
+        }
     });
 
     await page.goto(url, {
-        waitUntil: 'networkidle2',   // avoid network congestion
+        waitUntil: "networkidle2",   // avoid network congestion
         timeout: 3000,
     });
 
-    // parse node links
+    // collect node links and comment links
     const links = await page.$$eval("[src],[href],[data-url],[longDesc],[lowsrc]", func.getNodeLink);
 
     for (let link of links) {
@@ -47,6 +52,14 @@ const init = async ({page, data: url}) => {
         if (parsedURL != null) {
             console.log("parsedURL: " + parsedURL);
             cluster.queue(parsedURL);
+        }
+    }
+
+    const commentNodes = await page.$x("//comment()");
+    const commentUrls = await func.parseCommentUrl(commentNodes);
+    if(commentUrls !== undefined){
+        for(let url of commentUrls){
+            cluster.queue(url);
         }
     }
 
@@ -65,13 +78,37 @@ const init = async ({page, data: url}) => {
     for (let formNode of formNodes) {
         await formNode.executionContext().evaluate(form => form.setAttribute("target", "i_frame"), formNode);
 
-        const nodes = await formNode.$$("input, selector, textarea");
+        const nodes = await formNode.$$("input, select, textarea, datalist");
         for (let node of nodes) {
             let nodeName = (await node.executionContext().evaluate(node => node.nodeName, node)).toLowerCase();
-            let type = await node.executionContext().evaluate(node => node.getAttribute("type"), node);
-            await func.formHandler[nodeName](node, type);
+
+            if (nodeName === "input") {
+                let type = await node.executionContext().evaluate(node => node.getAttribute("type"), node);
+                await func.formHandler[nodeName](node, type);
+            } else if (nodeName === "textarea") {
+                await func.formHandler[nodeName](node);
+            } else {
+                await func.formHandler[nodeName](node, page);
+            }
         }
-        formNode.executionContext().evaluate(form => form.submit(), formNode);
+
+        try {
+            await formNode.executionContext().evaluate(form => form.submit(), formNode);
+        } catch (e) {
+            try {
+                let submit = await formNode.$("input[type=submit]");
+                submit.click();
+            } catch (e) {
+                try {
+                    let button = await formNode.$("button");
+                    button.click();
+                } catch (e) {
+                    console.log("form submit error!" + await page.url());
+                }
+            }
+        }
+
+
     }
 
     const title = await page.title();
@@ -80,16 +117,16 @@ const init = async ({page, data: url}) => {
 
 
 (async () => {
-/*eslint no-undef:0*/
+    /*eslint no-undef:0*/
     global.cluster = await Cluster.launch(config.clusterLaunchOptions);
 
-    cluster.on('taskerror', (err, data) => {
+    cluster.on("taskerror", (err, data) => {
         console.log(`Error crawling ${data}: ${err.message}`);
     });
 
     await cluster.task(init);
 
-    cluster.queue('http://speed.test');
+    cluster.queue("http://ctf.ctf/1.html");
 
     await cluster.idle();
     await cluster.close();

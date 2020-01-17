@@ -12,7 +12,7 @@ NodeJS实现的动态爬虫，用于触发所有请求，结合扫描器被动�
    - [x] 设置图片等资源返回
 - [x] 收集链接
    - [x] src、href、action等
-   - [ ] 注释中的url
+   - [x] 注释中的url
 - [ ] DOM构建后遍历节点，并触发节点中事件(包含对新节点的处理)
    - [ ] dom event
    - [x] inline event

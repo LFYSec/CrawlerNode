@@ -27,12 +27,10 @@ export const launchOptions = {
 };
 
 export const clusterLaunchOptions = {
-    concurrency: Cluster.CONCURRENCY_PAGE,  // 单Chrome多tab模式 TODO (? CONCURRENCY_CONTEXT)
-    maxConcurrency: 3,  // 并发的workers数
-    retryLimit: 2,   // 重试次数
-    skipDuplicateUrls: true,  // 不爬重复的url
+    concurrency: Cluster.CONCURRENCY_CONTEXT,  // 匿名上下文
+    maxConcurrency: 3,  // 并发worker数
+    retryLimit: 2,
+    skipDuplicateUrls: true,
     //monitor: true,  // 显示性能消耗
     puppeteerOptions: launchOptions,
-
-    // concurrency: Cluster.CONCURRENCY_CONTEXT,
 };
