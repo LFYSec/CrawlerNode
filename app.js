@@ -1,6 +1,10 @@
 import {Cluster} from "puppeteer-cluster"
 import * as func from "./func"
 import * as config from "./config"
+import * as eventHandler from "./handler/eventHandler"
+import * as formHandler from "./handler/formHandler"
+import * as linkHandler from "./handler/linkHandler"
+import * as navHandler from "./handler/navHandler"
 
 async function preparePage(page) {
     // set ua
@@ -31,10 +35,11 @@ const init = async ({page, data: url}) => {
 
     // lock the navigate
     await page.on("request", async (req) => {
-        const navUrls = await func.handleNav(req, page);
+        const navUrls = await navHandler.navHandler(req, page);
         if (navUrls !== undefined) {
             for (let url of navUrls) {
-                cluster.queue(url);
+                let parsedUrl = func.parseURL(url, page.url());
+                func.addQueue(parsedUrl);
             }
         }
     });
@@ -45,28 +50,32 @@ const init = async ({page, data: url}) => {
     });
 
     // collect node links and comment links
-    const links = await page.$$eval("[src],[href],[data-url],[longDesc],[lowsrc]", func.getNodeLink);
+    const links = await page.$$eval("[src],[href],[data-url],[longDesc],[lowsrc]", linkHandler.getNodeLink);
 
     for (let link of links) {
-        let parsedURL = func.parseURL(link, page.url());
+        let parsedURL = func.parseURL(link, await page.url());
         if (parsedURL != null) {
             console.log("parsedURL: " + parsedURL);
-            cluster.queue(parsedURL);
+            func.addQueue(parsedURL);
         }
     }
 
     const commentNodes = await page.$x("//comment()");
-    const commentUrls = await func.parseCommentUrl(commentNodes);
-    if(commentUrls !== undefined){
-        for(let url of commentUrls){
-            cluster.queue(url);
+    const commentUrls = await linkHandler.parseCommentUrl(commentNodes);
+    if (commentUrls !== undefined) {
+        for (let url of commentUrls) {
+            console.log(url);
+            let parsedUrl = func.parseURL(url, await page.url());
+            if(parsedUrl){
+                func.addQueue(parsedUrl);
+            }
         }
     }
 
     // inline event trigger
     for (let i = 0; i < config.inlineEvents.length; i++) {
         let eventName = config.inlineEvents[i];
-        await page.$$eval("[" + eventName + "]", func.inlineEventTrigger, eventName.replace("on", ""));
+        await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
     }
 
     // dom event collection and trigger
@@ -74,42 +83,7 @@ const init = async ({page, data: url}) => {
 
     // form collection and auto submit
     const formNodes = await page.$$("form");
-
-    for (let formNode of formNodes) {
-        await formNode.executionContext().evaluate(form => form.setAttribute("target", "i_frame"), formNode);
-
-        const nodes = await formNode.$$("input, select, textarea, datalist");
-        for (let node of nodes) {
-            let nodeName = (await node.executionContext().evaluate(node => node.nodeName, node)).toLowerCase();
-
-            if (nodeName === "input") {
-                let type = await node.executionContext().evaluate(node => node.getAttribute("type"), node);
-                await func.formHandler[nodeName](node, type);
-            } else if (nodeName === "textarea") {
-                await func.formHandler[nodeName](node);
-            } else {
-                await func.formHandler[nodeName](node, page);
-            }
-        }
-
-        try {
-            await formNode.executionContext().evaluate(form => form.submit(), formNode);
-        } catch (e) {
-            try {
-                let submit = await formNode.$("input[type=submit]");
-                submit.click();
-            } catch (e) {
-                try {
-                    let button = await formNode.$("button");
-                    button.click();
-                } catch (e) {
-                    console.log("form submit error!" + await page.url());
-                }
-            }
-        }
-
-
-    }
+    await formHandler.formHandler(formNodes, page);
 
     const title = await page.title();
     console.log(title);
@@ -126,7 +100,7 @@ const init = async ({page, data: url}) => {
 
     await cluster.task(init);
 
-    cluster.queue("http://ctf.ctf/1.html");
+    func.addQueue("http://ctf.ctf/1.html");
 
     await cluster.idle();
     await cluster.close();
