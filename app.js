@@ -46,7 +46,7 @@ const init = async ({page, data: url}) => {
 
     await page.goto(url, {
         waitUntil: "networkidle2",   // avoid network congestion
-        timeout: 3000,
+        timeout: 30000,
     });
 
     // collect node links and comment links
@@ -70,21 +70,23 @@ const init = async ({page, data: url}) => {
         }
     }
 
-    // inline event trigger TODO fix bug
+    // inline event trigger TODO fix bug, only request first url, maybe lock nav failed..
     const inlineEvents = ["onclick", "onblur", "onchange", "onabort", "ondblclick", "onerror", "onfocus", "onkeydown", "onkeypress", "onkeyup", "onload", "onmousedown", "onmousemove", "onmouseout", "onmouseover", "onmouseup", "onreset", "onresize", "onselect", "onsubmit", "onunload"];
-    // for (let i = 0; i < inlineEvents.length; i++) {
-    //     let eventName = inlineEvents[i];
-    //     console.log(eventName);
-    //     await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
+
+    // for(let eventName of inlineEvents){
+    //     //let result = await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
+    //     let nodes = await page.$$("[" + eventName + "]");
+    //     for (let node of nodes) {
+    //         let event = await node.executionContext().evaluate((node, name) => {
+    //             let event = document.createEvent("CustomEvent");
+    //             event.initCustomEvent(name, true, true, null);
+    //             node.dispatchEvent(event);
+    //             return eventName;
+    //         }, node, eventName.replace("on", ""));
+    //         console.log(event);
+    //     }
+    //     console.log(result);
     // }
-    for(let eventName of inlineEvents){
-        let nodes = await page.$$("[" + eventName + "]");
-        for(let node of nodes){
-            let nodename = await node.executionContext().evaluate(node => node.nodeName, node);
-            console.log(nodename);
-        }
-        await page.$$eval("[" + eventName + "]", eventHandler.inlineEventTrigger, eventName.replace("on", ""));
-    }
 
     // dom event collection and trigger
     eventHandler.domEventTrigger();
@@ -112,9 +114,9 @@ const init = async ({page, data: url}) => {
     global.EVENT_LIST = [];
     global.HOOK_URL_LIST = [];
 
-    cluster.on("taskerror", (err, data) => {
-        console.log(`Error crawling ${data}: ${err.message}`);
-    });
+    // cluster.on("taskerror", (err, data) => {
+    //     console.log(`Error crawling ${data}: ${err.message}`);
+    // });
 
     await cluster.task(init);
 

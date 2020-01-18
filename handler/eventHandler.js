@@ -1,17 +1,15 @@
 export const inlineEventTrigger = (nodes, eventName) => {
-    // console.log(eventName)
-    // for (let node of nodes) {
-    //     console.log("inline event: "+node.nodeName + "  " + eventName);
-    //     let event = document.createEvent("CustomEvent");
-    //     event.initCustomEvent(eventName, false, true, null);
-    //     try {
-    //         node.dispatchEvent(event);
-    //     } catch (e) {
-    //         console.log(e);
-    //     }
-    // }
-
-
+    let result = [];
+    for (let node of nodes) {
+        let event = document.createEvent("CustomEvent");
+        event.initCustomEvent(eventName, false, true, null);
+        try {
+            node.dispatchEvent(event);
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    return result;
 };
 
 export const domEventTrigger = () => {
